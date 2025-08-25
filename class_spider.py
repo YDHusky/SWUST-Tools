@@ -1,3 +1,4 @@
+import logging
 import time
 
 from oa_auth import OAAuth
@@ -5,25 +6,32 @@ from concurrent.futures import ThreadPoolExecutor
 from parsel import Selector
 from loguru import logger
 
+from wx_login_test import WXLogin
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(filename)s - %(levelname)s - %(message)s')
 
 class ClassSpider:
-    def __init__(self, username, password):
+    def __init__(self, ct=1):
         self.class_type = ["programTask", "commonTask", "sportTask"]
         self.choose_params = {
             "sportTask": "SportTask",
             "commonTask": "CommonTask",
             "programTask": "PlanTask",
+
         }
-        self.oa = OAAuth(
-            service="https://matrix.dean.swust.edu.cn/acadmicManager/index.cfm?event=studentPortal:DEFAULT_EVENT")
-        self.oa.login(username, password)
+        self.ct = ct
+        # self.oa = OAAuth(
+        #     service="https://matrix.dean.swust.edu.cn/acadmicManager/index.cfm?event=studentPortal:DEFAULT_EVENT")
+        # self.oa.login(username, password)
+        self.oa = WXLogin(service="https://matrix.dean.swust.edu.cn/acadmicManager/index.cfm?event=studentPortal:DEFAULT_EVENT")
+        self.oa.wx_login()
+        # /acadmicManager/index.cfm?event=chooseCourse:programTask&CT=2
         self.headers = {
             "accept": "*/*",
             "accept-language": "zh-CN,zh;q=0.9",
             "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
             "origin": "https://matrix.dean.swust.edu.cn",
             "priority": "u=1, i",
-            "referer": "https://matrix.dean.swust.edu.cn/acadmicManager/index.cfm?event=chooseCourse:sportTask&CT=1",
+            "referer": f"https://matrix.dean.swust.edu.cn/acadmicManager/index.cfm?event=chooseCourse:sportTask&CT={ct}",
             "sec-ch-ua": "\"Google Chrome\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": "\"Windows\"",
@@ -62,7 +70,7 @@ class ClassSpider:
         params = {
             "event": f"chooseCourse:apiChoose{self.choose_params[data['class_type']]}"
         }
-        res = self.oa.get_session().post(url, data=data, headers=self.headers, params=params)
+        res = self.oa.get_session().post(url, data=data, headers=self.headers, params=params,verify=False)
         if res.json()['success']:
             logger.success(f"成功选择: {name}")
             return True
@@ -71,8 +79,8 @@ class ClassSpider:
             return False
 
     def get_class_id(self, class_type):
-        url = f"https://matrix.dean.swust.edu.cn/acadmicManager/index.cfm?event=chooseCourse:{class_type}&CT=1"
-        res = self.oa.get_session().get(url)
+        url = f"https://matrix.dean.swust.edu.cn/acadmicManager/index.cfm?event=chooseCourse:{class_type}&CT={self.ct}"
+        res = self.oa.get_session().get(url,verify=False)
         document = Selector(text=res.text)
         class_list = document.css(".courseShow")
         data_list = []
@@ -92,7 +100,7 @@ class ClassSpider:
         data = {
             "CID": data["cid"],
         }
-        res = self.oa.get_session().post(url, data=data, headers=self.headers, params=params)
+        res = self.oa.get_session().post(url, data=data, headers=self.headers, params=params,verify=False)
         document = Selector(text=res.text)
         data = document.css(".editRows")
         t_header = document.css("thead td::text").getall()
@@ -116,7 +124,7 @@ class ClassSpider:
             choose_data = js_code.split("chooseCourse(")[1].strip(")';").split("','")
             # 将参数转换为字典
             data = {
-                "CT": "1",  # 这个值是固定的，根据你的要求
+                "CT": str(self.ct),  # 这个值是固定的，根据你的要求
                 "TID": choose_data[2].strip("'"),
                 "CID": choose_data[0].strip("'"),
                 "CIDX": choose_data[1].strip("'"),
@@ -216,10 +224,5 @@ class ClassSpider:
 
 
 if __name__ == '__main__':
-    import yaml
-    with open('config.yml', 'r') as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-    username = config['username']
-    password = config['password']
-    test = ClassSpider(username, password)
+    test = ClassSpider(ct=2)
     test.main()
