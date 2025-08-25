@@ -7,7 +7,7 @@ from parsel import Selector
 from loguru import logger
 
 from wx_login_test import WXLogin
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(filename)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(filename)s - %(levelname)s - %(message)s')
 
 class ClassSpider:
     def __init__(self, ct=1):
